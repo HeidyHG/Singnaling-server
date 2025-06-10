@@ -1,29 +1,30 @@
-const WebSocket = require('ws');
+const http = require('http');
+const io = require('socket.io');
 
-// Crear servidor WebSocket en el puerto 3000
-const wss = new WebSocket.Server({ port: 3000 });
+const server = http.createServer();
+const socketServer = io(server, {
+  cors: {
+    origin: "*"
+  }
+});
 
-const clients = new Set();
+socketServer.on('connection', socket => {
+  console.log('Usuario conectado:', socket.id);
 
-wss.on('connection', (ws) => {
-  clients.add(ws);
-  console.log('✅ Cliente conectado. Total:', clients.size);
-
-  ws.on('message', (message) => {
-    console.log('📨 Mensaje recibido:', message.toString());
-
-    // Enviar mensaje a todos los demás clientes (menos al emisor)
-    for (let client of clients) {
-      if (client !== ws && client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    }
+  socket.on('signal', data => {
+    console.log('Señal recibida:', data);
+    // data = { targetId, message }
+    socket.to(data.targetId).emit('signal', {
+      senderId: socket.id,
+      message: data.message
+    });
   });
 
-  ws.on('close', () => {
-    clients.delete(ws);
-    console.log('❌ Cliente desconectado. Total:', clients.size);
+  socket.on('disconnect', () => {
+    console.log('Usuario desconectado:', socket.id);
   });
 });
 
-console.log('🚀 Servidor WebRTC señalización corriendo en ws://localhost:3000');
+server.listen(3000, () => {
+  console.log('Servidor de señalización escuchando en el puerto 3000');
+});
